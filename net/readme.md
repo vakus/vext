@@ -8,9 +8,10 @@ with few small differences to make it more human friendly.
 
 - [x] Register into network by broadcasting own hostname
 - [x] Save known network for future reference
-- [ ] Send and Receive messages using hostname
+- [x] Send messages using hostname or addresses
 - [ ] Supporting program: ping
 - [ ] Relay messages between two networks
+- [ ] Support for networking with tunnels
 
 # Why?
 
@@ -43,14 +44,6 @@ For simplicity the requests will be sent on port 1.
 Whenever a new computer is added to the network, the routing lookup
 table is also saved in `/etc/hosts`.
 
-# Clarifications
-
-**IMPORTANT:** Within this document I refer to Universally Unique Identifier (UUID)
-number of times. I also used it as data type, which doesn't exist within
-OpenComputers. While the *actual* backing data type is string I have
-done this to allow to quickly distinguish between Human friendly
-identifier, and the UUID address of a computer.
-
 # Messages
 
 The messages in my network protocol use OpenComputers message
@@ -69,36 +62,130 @@ The following messages are sent on port 1.
 
 This is the list of events that my network layer raises.
 
-- `arp_register(hostname: string, address: uuid)` - raised when a new
+- `arp_register(hostname: string, address: string)` - raised when a new
 hostname is added to the internal routing table.
   - `hostname` - the hostname of computer that was registered
   - `address` - the network uuid of computer that was registered
 
 # Functions
 
+There will be fairly few functions that will reasemble OpenComputer's
+modem API. The functions in here work in similar matter but allow to
+automatically perform hostname lookups, and abstract concept of multiple
+network adapters, instead treating them as if they all were one network.
+
 - `net.broadcast(port: number, ...)`
  
   Simplified method to broadcast message through all available network
-  modems
+  modems.
   - `port` - the port on which the message is broadcasted
   - `...` - data. This is essentially passed forward to each modem and
   has the same limitations as data in 
   [`send` or `broadcast` commands](https://ocdoc.cil.li/component:modem)
 
-- `net.findAddress(hostname: string, [timeout: number]): uuid` 
+- `net.isAddress(target: string): isAddress: boolean`
+
+  Checks if the passed `target` is considered an UUID address.
+  - `target` - the string to check
+
+  Returns:
+  - `isAddress` - true if string is a UUID address, false otherwise.
+
+- `net.isHostname(target: string): isHostname: boolean`
+
+  Checks if the passed `target` is considered as hostname.
+  Opposite to `net.isAddress` function.
+  - `target` - the string to check
+
+  Returns:
+  - `isHostname` - true if string is not an UUID address, false
+  otherwise.
+
+- `net.lookupAddress(hostname: string): address: string`
+
+  Attempt finding computer's address by the computer hostname.
+  This will only lookup local cache and will not actively search the
+  network if a computer is not known.
+  If the hostname is already an address as decided by `net.isAddress`
+  then the hostname is simply returned.
+
+  Returns:
+  - `address` - the UUID address of the machine with the specified
+  hostname, or `nil` if the machine was not found.
+
+- `net.findAddress(hostname: string, [timeout: number], [nocache: boolean]): address: string` 
 
   Attempt finding computer's address by the computers hostname.
   When a hostname is successfully retrieved it is cached for future use
   to reduce network traffic.
-  If a searched hostname is either already known, or another computer
-  responds to the ARP/FIND command within timeout time, this command
-  will return the UUID of the computer with specified hostname. If the
-  name is not known, and no computer's respond within the timeout, this
-  method will return `nil`.
+  If the hostname is already an address as decided by `net.isAddress`
+  then the hostname is simply returned.
+  If a searched hostname is either already known (and nocache is set to
+  false), or another computer responds to the ARP/FIND command within
+  timeout time, this command will return the UUID address of the
+  computer with specified hostname. If the name is not known, and no
+  computer's respond within the timeout, this method will return `nil`.
 
   - `hostname` - the hostname of the computer your trying to find
   - `timeout` - the maximum time in seconds you wish to wait. The
   default is 3 seconds.
+  - `nocache` - default false, if set to true it will always actively
+  search for computer with given hostname even if the hostname exists
+  in the cache. Successfully finding computer will still save it to
+  cache and emit `arp_register` event.
+
+  Returns:
+  - `address` - the UUID address of the machine with the specified
+  hostname, or `nil` if the machine was not found.
+
+- `net.isOpen(port: number): opened: boolean`
+
+  Checks if port is opened on the network. Ports managed by net are
+  stored in `net.ports` table. This allows to automatically open ports
+  for any newly inserted hardware while the program is running.
+
+  - `port` - the port to be checked
+
+- `net.open(port: number): success: boolean, errorMessage: string`
+
+  Opens the port on the network.
+  - `port` - the port to be opened
+
+  Returns:
+  - `success` - true if port was opened successfully, false otherwise,
+  - `errorMessage` - the reason why operation has failed, empty if
+  success is true.
+
+- `net.close(port: number): success: boolean, errorMessage: string`
+
+  Closes the port on the network
+  - `port` - the port to be closed
+
+  Returns:
+  - `success` - true if port was closed successfully, false otherwise,
+  - `errorMessage` - the reason why operation has failed, empty if
+  success is true.
+
+- `net.send(target: string, port: number, ...): success: boolean, errorMessage: string`
+
+  Sends network message to specific target. If target is provided in
+  UUID format then it will be used up directly. Otherwise a lookup is
+  done before sending the message.
+
+  - `target` - target where the message should be sent. If the target
+  matches UUID format
+  `^(%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x)$`
+  then it will be used as address of machine. Otherwise it will attempt
+  to be translated to address using `net.findAddress`.
+  - `port` - the target port to send the message on
+  - `...` - the data section of the message.
+
+  Returns:
+  - `success` - true if the message was sent successfully. This does not
+  guarantee delivery of the message.
+  - `errorMessage` - reason why the message sending failed, empty
+  otherwise.
+
 
 # Security considerations
 
