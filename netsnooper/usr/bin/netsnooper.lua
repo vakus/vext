@@ -1,5 +1,4 @@
 local computer = require("computer")
-local component = require("component")
 local event = require("event")
 
 local function tableContains(table, value)
@@ -13,12 +12,6 @@ end
 
 local args = {...}
 local beepEnabled = not tableContains(args, "--silent")
-local tunnel = component.getPrimary("tunnel")
-
-if tunnel == nil then
-  print("[FATAL] Tunnel not found...")
-  return
-end
 
 local function filter(name, ...)
   return name == "interrupted" or name == "modem_message"
