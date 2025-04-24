@@ -77,6 +77,43 @@ runTest("Log level filtering", function()
   end
 end)
 
+runTest("safeCall doesn't log successful function", function()
+  local logger = createLogger()
+  local mockSink = {
+    minLevel = logger.LoggerLevel.WARNING,
+    written = {},
+  }
+
+  function mockSink.write(level, msg)
+    table.insert(mockSink.written, {level = level, message = msg})
+  end
+
+  logger.addSink(mockSink)
+
+  logger.safeCall(function() end)
+  assertEqual(#mockSink.written, 0, "No logs should be written without any errors")
+end)
+
+runTest("safeCall logs exceptions thrown", function()
+  local logger = createLogger()
+  local mockSink = {
+    minLevel = logger.LoggerLevel.WARNING,
+    written = {},
+  }
+
+  function mockSink.write(level, msg)
+    table.insert(mockSink.written, {level = level, message = msg})
+  end
+
+  logger.addSink(mockSink)
+
+  logger.safeCall(function()
+    error("Test exception")
+  end)
+  
+  assertEqual(#mockSink.written, 1, "Error message should be logged")
+end)
+
 print("\nTest Results:")
 for _, line in ipairs(results.log) do
   print(line)

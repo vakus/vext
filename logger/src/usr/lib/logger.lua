@@ -99,6 +99,14 @@ local function createLogger()
   function self.info(msg)     self.__internalLog(LoggerLevel.INFO, "info", msg) end
   function self.debug(msg)    self.__internalLog(LoggerLevel.DEBUG, "debug", msg) end
 
+  function self.safeCall(fn)
+    xpcall(fn, function(err)
+      local trace = debug.traceback(err, 2)
+      self.critical(trace)
+      return err
+    end)
+  end
+
   return self
 end
 

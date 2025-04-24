@@ -121,7 +121,8 @@ Sets new format of the string being logged.
 The default formatter is `[%t] [%l] %m`
 The replaced tokens are 
 - `%t` - replaced with time in `%H:%M:%S` format
-- `%l` - replaced with verbose name of the log level, e.g. "critical" or "warning"
+- `%l` - replaced with verbose name of the log level, e.g. "critical" or
+"warning"
 - `%m` - replaced with the actual message being logged
 
 ### Logger.critical(message: string)
@@ -143,6 +144,16 @@ Creates a info log with specified message
 ### Logger.debug(message: string)
 
 Creates a debug log with specified message
+
+### Logger.safeCall(fn: function)
+
+Runs the provided function in a protected call. If the function throws
+an error, it will be caught and logged as a `CRITICAL` log.
+
+This is useful for wrapping the main entrypoint of a program, to ensure
+any unexpected errors are still captured by the logger.
+
+This function will also log the stacktrace.
 
 # Sink
 
